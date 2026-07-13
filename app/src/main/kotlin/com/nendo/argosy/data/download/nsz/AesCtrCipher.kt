@@ -42,8 +42,11 @@ class AesCtrCipher(
         }
     }
 
-    fun process(data: ByteArray): ByteArray = cipher.update(data)
+    fun process(data: ByteArray): ByteArray =
+        if (data.isEmpty()) data else cipher.update(data)
 
+    // Cipher.update() returns null (not empty) for zero-length input on some
+    // providers; guard so a zero-length chunk can never NPE.
     fun process(data: ByteArray, offset: Int, length: Int): ByteArray =
-        cipher.update(data, offset, length)
+        if (length == 0) ByteArray(0) else cipher.update(data, offset, length)
 }

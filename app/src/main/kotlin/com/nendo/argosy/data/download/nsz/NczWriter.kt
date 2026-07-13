@@ -135,14 +135,11 @@ object NczWriter {
             val remaining = length - offset
 
             val chunkSize = if (section != null) {
-                val sectionEnd = section.offset + section.size
-                val bytesToSectionEnd = (sectionEnd - pos).toInt()
-                minOf(remaining, bytesToSectionEnd)
+                clampChunk(remaining, (section.offset + section.size) - pos)
             } else {
                 val nextSection = findNextSection(sections, pos)
                 if (nextSection != null) {
-                    val bytesToNext = (nextSection.offset - pos).toInt()
-                    minOf(remaining, bytesToNext)
+                    clampChunk(remaining, nextSection.offset - pos)
                 } else {
                     remaining
                 }
@@ -168,6 +165,14 @@ object NczWriter {
             pos += chunkSize
         }
     }
+
+    // Clamp a small per-buffer `remaining` (<= buffer size) to the distance to
+    // the next boundary. The distance is a Long because a section or gap can
+    // exceed 2 GiB (e.g. a 28 GiB program NCA); computing (boundary - pos) as
+    // Int first would overflow to 0/negative, yielding a zero-length chunk whose
+    // Cipher.update() returns null -> NPE. Narrow only after the min.
+    internal fun clampChunk(remaining: Int, bytesToBoundary: Long): Int =
+        minOf(remaining.toLong(), bytesToBoundary).toInt()
 
     private fun findSection(
         sections: List<NczSection>,
