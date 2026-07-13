@@ -376,6 +376,11 @@ object NszDecompressor {
         override fun read(b: ByteArray, off: Int, len: Int): Int =
             raf.read(b, off, len)
 
-        override fun available(): Int = 0
+        // Must report the real remaining bytes: zstd-jni's ZstdInputStream only
+        // refills its compressed-input buffer while in.available() > 0, so
+        // returning 0 makes it stop reading mid-frame and desync — corrupting
+        // any NCZ large enough to need more than one input refill per read().
+        override fun available(): Int =
+            (raf.length() - raf.filePointer).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
     }
 }
