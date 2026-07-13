@@ -300,10 +300,12 @@ object NszDecompressor {
                 NczHeaderParser.NCA_HEADER_SIZE
         }
 
-        raf.seek(nczHeader.compressedDataOffset)
+        // compressedDataOffset is relative to the NCZ entry's start, not the
+        // container file: without entry.dataOffset the zstd stream is read
+        // from inside the container headers ("unknown frame descriptor").
         val compressedStream = BufferedInputStream(
             RandomAccessFileInputStream(
-                raf, nczHeader.compressedDataOffset
+                raf, entry.dataOffset + nczHeader.compressedDataOffset
             ),
             COPY_BUFFER_SIZE
         )
