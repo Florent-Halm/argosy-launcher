@@ -149,10 +149,12 @@ object NczWriter {
             }
 
             if (section != null && section.needsEncryption) {
+                // CTR block index derives from the absolute NCA offset,
+                // not the section-relative one.
                 val cipher = AesCtrCipher(
                     section.cryptoKey,
                     section.cryptoCounter,
-                    pos - section.offset
+                    pos
                 )
                 val encrypted = cipher.process(
                     data, offset, chunkSize

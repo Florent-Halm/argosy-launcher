@@ -70,19 +70,29 @@ class AesCtrCipherTest {
     }
 
     @Test
-    fun `addCounterBigEndian adds value correctly`() {
-        val counter = ByteArray(16) { 0 }
-        AesCtrCipher.addCounterBigEndian(counter, 0x100)
-        assert(counter[6] == 1.toByte())
-        assert(counter[7] == 0.toByte())
-    }
+    fun `IV layout matches NCA reference - nonce high, block index low`() {
+        // Known-answer vector generated with pycryptodome (nsz's crypto):
+        // AES-CTR(key=00..0f, counter = nonce a0..a7 || (0x4000 >> 4) BE)
+        // over 16 zero bytes. Pins the NCA IV layout: nonce in bytes 0..7,
+        // absolute-offset block index big-endian in bytes 8..15.
+        val key = ByteArray(16) { it.toByte() }
+        val counter = ByteArray(16) { i ->
+            if (i < 8) (0xA0 + i).toByte() else 0
+        }
 
-    @Test
-    fun `addCounterBigEndian handles carry`() {
-        val counter = ByteArray(16) { 0 }
-        counter[7] = 0xFF.toByte()
-        AesCtrCipher.addCounterBigEndian(counter, 1)
-        assert(counter[6] == 1.toByte())
-        assert(counter[7] == 0.toByte())
+        val cipher = AesCtrCipher(key, counter, 0x4000)
+        val ciphertext = cipher.process(ByteArray(16))
+
+        val expected = byteArrayOf(
+            0x8A.toByte(), 0xB9.toByte(), 0x25, 0x72,
+            0x8F.toByte(), 0x92.toByte(), 0xF1.toByte(), 0x4C,
+            0x4E, 0x38, 0x83.toByte(), 0x83.toByte(),
+            0x1A, 0xE7.toByte(), 0x3F, 0x08
+        )
+        assertArrayEquals(
+            "IV layout must match nsz reference implementation",
+            expected,
+            ciphertext
+        )
     }
 }
