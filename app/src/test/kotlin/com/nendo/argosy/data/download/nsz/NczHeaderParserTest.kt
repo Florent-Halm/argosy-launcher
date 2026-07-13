@@ -90,6 +90,38 @@ class NczHeaderParserTest {
         NczHeaderParser.parse(ByteArrayInputStream(data))
     }
 
+    @Test
+    fun `parse accepts NCZBLOCK version 2`() {
+        val data = buildNczsectnHeader(
+            sections = listOf(TestSection(0x4000, 0x100000, 3)),
+            includeBlockHeader = true,
+            blockExponent = 14,
+            blockCount = 2,
+            decompressedSize = 0x8000,
+            compressedBlockSizes = intArrayOf(4000, 3500),
+            blockVersion = 2
+        )
+
+        val result = NczHeaderParser.parse(ByteArrayInputStream(data))
+
+        assertNotNull(result.blockHeader)
+        assertEquals(2, result.blockHeader!!.numberOfBlocks)
+    }
+
+    @Test
+    fun `parse accepts more than 100 sections`() {
+        // BKTR-patched update NCAs emit one section per crypto subsection;
+        // real titles exceed 100 (e.g. Cadence of Hyrule: 116).
+        val sections = (0 until 116).map {
+            TestSection(0x4000L + it * 0x1000, 0x1000, 3)
+        }
+
+        val data = buildNczsectnHeader(sections = sections)
+        val result = NczHeaderParser.parse(ByteArrayInputStream(data))
+
+        assertEquals(116, result.sections.size)
+    }
+
     @Test(expected = IOException::class)
     fun `parse throws on excessive section count`() {
         val buf = ByteBuffer.allocate(16)
@@ -113,7 +145,8 @@ class NczHeaderParserTest {
         blockExponent: Int = 14,
         blockCount: Int = 0,
         decompressedSize: Long = 0,
-        compressedBlockSizes: IntArray = IntArray(0)
+        compressedBlockSizes: IntArray = IntArray(0),
+        blockVersion: Int = 1
     ): ByteArray {
         val sectionDataSize = 8 + 8 + (sections.size * 64)
         val blockDataSize = if (includeBlockHeader) {
@@ -141,7 +174,7 @@ class NczHeaderParserTest {
 
         if (includeBlockHeader) {
             buf.put("NCZBLOCK".toByteArray())
-            buf.put(1) // version
+            buf.put(blockVersion.toByte()) // version
             buf.put(0) // type
             buf.put(0) // unused
             buf.put(blockExponent.toByte())

@@ -67,7 +67,10 @@ object NczHeaderParser {
 
     const val NCA_HEADER_SIZE = 0x4000L
     private const val SECTION_ENTRY_SIZE = 64
-    private const val MAX_SECTION_COUNT = 100
+    // The NCZ spec has no section-count limit; BKTR-patched update NCAs
+    // routinely exceed 100 (one section per crypto subsection). Keep a bound
+    // only to reject garbage headers.
+    private const val MAX_SECTION_COUNT = 4096
 
     private val NCZSECTN_MAGIC = "NCZSECTN".toByteArray(Charsets.US_ASCII)
     private val NCZBLOCK_MAGIC = "NCZBLOCK".toByteArray(Charsets.US_ASCII)
@@ -137,7 +140,10 @@ object NczHeaderParser {
 
     private fun parseBlockHeader(input: InputStream): NczBlockHeader {
         val version = readExact(input, 1)[0].toInt() and 0xFF
-        require(version == 1) { "Unsupported NCZBLOCK version: $version" }
+        // nsz has emitted NCZBLOCK version 2 for years (same layout as v1);
+        // rejecting it breaks all block-compressed XCZ/NSZ, which is nsz's
+        // default mode for XCI input.
+        require(version == 1 || version == 2) { "Unsupported NCZBLOCK version: $version" }
 
         val typeBytes = readExact(input, 1)[0].toInt() and 0xFF
         require(typeBytes == 0) { "Unsupported NCZBLOCK type: $typeBytes" }
